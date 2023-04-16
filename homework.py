@@ -12,14 +12,6 @@ from dotenv import load_dotenv
 from exception import GetStatusException
 load_dotenv()
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s - %(name)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        RotatingFileHandler('logfile.log', maxBytes=50000000, backupCount=5)
-    ]
-)
-
 logger = logging.getLogger('my_logger')
 logger.setLevel(logging.DEBUG)
 
@@ -40,16 +32,7 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Проверяет доступ к переменным окружения, необходимых для работы бота."""
-    tokens = [
-        ('TELEGRAM_TOKEN', TELEGRAM_TOKEN),
-        ('TELEGRAM_CHAT_ID', TELEGRAM_CHAT_ID),
-        ('PRACTICUM_TOKEN', PRACTICUM_TOKEN),
-    ]
-    for token, value in tokens:
-        if value is None:
-            logger.critical(f'{token} переменная недоступна.')
-            return False
-    return True
+    return all([TELEGRAM_TOKEN, PRACTICUM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def send_message(bot, message):
@@ -76,7 +59,7 @@ def get_api_answer(timestamp):
         )
     except requests.exceptions.RequestException as error:
         error_message = f'Ошибка при запросе к API: {error}'
-        raise KeyError(error_message)
+        raise ConnectionError(error_message)
 
     status_code = homework_statuses.status_code
     if status_code != HTTPStatus.OK:
@@ -124,7 +107,9 @@ def parse_status(homework):
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
-        return
+        logging.critical('Отсутствует необходимое кол-во'
+                         ' переменных окружения')
+        sys.exit('Отсутсвуют переменные окружения')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     logger.debug(f'Старт работы бота {timestamp}')
@@ -148,4 +133,14 @@ def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        format=('%(asctime)s'
+                '%(levelname)s'
+                '%(message)s'
+                '%(name)s'),
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            RotatingFileHandler('logfile.log',
+                                maxBytes=50000000,
+                                backupCount=5)])
     main()
